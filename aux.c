@@ -19,7 +19,7 @@ char** separaString(char* buffer){
     char** comando = NULL;
     int nrComandos = 1;
     
-    for (int i = 0; buffer[i]!='\0'; i++)
+    for (int i = 0; buffer[i]!='\n'; i++)
     {
         if (buffer[i] == ' ') nrComandos++;
     }
