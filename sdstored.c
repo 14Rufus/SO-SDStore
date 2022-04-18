@@ -10,17 +10,20 @@
 //#include <errno.h>
 #include <time.h>
 #include <signal.h>
-#include "sdstored.h"
-#include "aux.c"
-#include "aux.h"
+
+//struct Pedidos
+typedef struct listaP *ListaP;
 
 
+//struct Transformações
+typedef struct listaT *ListaT;
 
 ListaT listaTransf = NULL;
 ListaP pendentes = NULL;
 ListaP execucao = NULL;
 
-//int comandoSize = 0; -> include "aux.c"
+int comandoSize = 0;
+int numeroTarefa = 1;
 
 
 
@@ -38,8 +41,7 @@ struct listaP {
 //struct Transformações
 struct listaT {
   int max;
-  int curr;
-  char* filtro;
+  int curr; //current
   char* executavel;
   int *pids;
   struct listaT *prox;
@@ -50,17 +52,105 @@ void help(int fdwr) {
     write(fdwr, help, sizeof(help));
 }
 
-int executar(char* input,char* output,char** transf,int numTransf) {
-//   printf("%s %s %d\n", input,output,numFiltros);
-  for (int i = 0; i < numTransf; ++i)
-  {
-    // printf("%s\n", filtros[i]);
-  }
 
-  int fd_output = open(output, O_CREAT | O_WRONLY | O_TRUNC, 0600);
-  int fd_input = open(input, O_RDONLY);
-  char* path = malloc(1024 * sizeof(char));
-  strcpy(path,"SDStore-transf/");
+
+char** separaString(char* buffer){
+    char** comando = NULL;
+    int nrComandos = 1;
+    
+    for (int i = 0; buffer[i]!='\n'; i++)
+    {
+        if (buffer[i] == ' ') nrComandos++;
+    }
+
+    buffer = strtok(buffer, "\n");
+    
+    comando = (char**) realloc(comando, (nrComandos + 1) * sizeof(char*));
+
+    char* token = strtok(buffer," ");
+    comando[0] = strdup(token);
+
+    int nrComando = 1; 
+    while ((token = strtok(NULL," ")) != NULL)
+    {
+        comando[nrComando] = strdup(token);
+        nrComando++;
+    }
+    comandoSize = nrComandos;
+    return comando;
+}
+
+    ssize_t readln (int fd, char *buffer, size_t size) {
+
+    int resultado = 0, i = 0;
+
+    ssize_t read_bytes = 0;
+
+    while ((resultado = read (fd, &buffer[i], 1)) > 0 && i < size) {
+        if (buffer[i] == '\n') {
+            i += resultado;
+            return i;
+        }
+
+        i += resultado;
+    }
+
+    return i;
+}
+
+ListaT adicionaT (int max, char* executavel,ListaT l) {
+    ListaT aux = l;
+    ListaT new = malloc(sizeof(ListaT));
+    new->max = max;
+    new->curr = 0;
+    new->executavel = malloc(sizeof(char) * strlen(executavel));
+    new->pids = malloc(sizeof(int)*max);
+    strcpy(new->executavel,executavel);
+    new->prox = NULL;
+
+    if (!l) {
+        return new;
+    }
+
+    for (; aux->prox; aux = aux->prox);
+
+    aux->prox = new;
+
+    return l;
+}
+
+
+
+void lerConfig(char* file) {
+    char *buffer = malloc(1024 * sizeof(char));
+    char *filtro;
+    char *exec;
+    char *max;
+    int fd_config = open(file, O_RDONLY);
+    int i = 0,n,o = 0,i2 = 0;
+    char* token;
+
+
+    while ((n = readln(fd_config,buffer,1024 * sizeof(char))) > 0) {
+        token = strtok(buffer," ");
+        filtro = strdup(token);
+        token = strtok(NULL," ");
+        exec = strdup(token);
+        token = strtok(NULL," ");
+        max = strdup(token);
+
+        //printf("%s %s %s\n", filtro,exec,max);
+        listaTransf = adicionaT(atoi(max),exec,listaTransf);
+    }
+}
+
+
+
+int executar(char* input,char* output,char** transf,int numTransf) {
+    int fd_output = open(output, O_CREAT | O_WRONLY | O_TRUNC, 0600);
+    int fd_input = open(input, O_RDONLY);
+    char* path = malloc(1024 * sizeof(char));
+    strcpy(path,"SDStore-transf/");
 
 //   printf("%d %d\n", fd_output, fd_input);
 
@@ -70,15 +160,16 @@ int executar(char* input,char* output,char** transf,int numTransf) {
 
 
     if(numTransf == 1) {
-      transf[0] = strcat(path,transf[0]);
-      dup2(fd_input,0);
-      close(fd_input);
-      dup2(fd_output,1);
-      close(fd_output);
+        transf[0] = strcat(path,transf[0]);
+        dup2(fd_input,0);
+        close(fd_input);
+        dup2(fd_output,1);
+        close(fd_output);
+    
+        
+        execlp(transf[0],transf[0],NULL);
 
-      execlp(transf[0],transf[0],NULL);
-
-      return 0;
+        return 0;
     }
 
 
@@ -101,14 +192,12 @@ int executar(char* input,char* output,char** transf,int numTransf) {
                     return -1;
                 case 0:
                     // codigo do filho 0
-
-                    dup2(fd_input,0);
+                    
                     close(p[i][0]);
-
                     dup2(p[i][1],1);
                     close(p[i][1]);
 
-                    execlp(transf[i],transf[i],NULL);
+                    execlp(transf[i],transf[i],input,NULL);
 
                     _exit(0);
                 default:
@@ -125,11 +214,9 @@ int executar(char* input,char* output,char** transf,int numTransf) {
 
                     dup2(p[i-1][0],0);
                     close(p[i-1][0]);
-
-                    dup2(fd_output,1);
                     close(p[i][1]);
 
-                    execlp(transf[i],transf[i],NULL);
+                    execlp(transf[i],transf[i],output,NULL);
 
                     _exit(0);
                 default:
@@ -173,31 +260,55 @@ int executar(char* input,char* output,char** transf,int numTransf) {
     return 1;
 }
 
+
+
 int main(int argc, char const *argv[]) {
 
 
     char *buffer = malloc(1024 * sizeof(char));
     char **comando;
 
-    while (read(0,buffer,sizeof(char) * 1024) ){
         
-        int comandoSize = 0;
-        comando = separaString(buffer, comandoSize);
+    while (readln(0,buffer,sizeof(char) * 1024) ){
         
+    
+        comando = separaString(buffer);
+
+        /*if(!strcmp(comando[0], "status")) {
+                fd_fifo_server_client = open("server_client_pipe", O_WRONLY);
+                printLista(pendentes,fd_fifo_server_client);
+                printListaFiltros(listaFiltros,fd_fifo_server_client);
+                close(fd_fifo_server_client);
+        } 
+        */
+        //else 
+        if(!strcmp(comando[0],"proc-file") ){
         
-        if(!strcmp(comando[0],"proc-file") && comandoSize > 4){
+        char** transformacoes = NULL; //<------ falta preencher mas preciso de perceber a estrutura faaaaaaaaaaaaaaaaaaaaaaaaaaaaack
+        int pid;
 
-          char** transformacoes = NULL; //<------ falta preencher mas preciso de perceber a estrutura faaaaaaaaaaaaaaaaaaaaaaaaaaaaack
-          int pid;
+            printf("%s", comando[3]);
+            fflush(0);
 
-          if(!(pid = fork())){
-            
-                        //EXECUTAR TAREFA
-                        executar(comando[1],comando[2],transformacoes,comandoSize - 4);
-                        //sleep(3);
-                        _exit(0);
+        char* tarefa = malloc(1024 * sizeof(char));
+            strcpy(tarefa,comando[0]);
+            int i = 1;
+            while(i < comandoSize) { // - 1 era o que dava mal
+                if(i > 2) {
+                    transformacoes = (char**) realloc(transformacoes, (i + 1) * sizeof(char*)); //1024
+                    transformacoes[i - 3] = strdup(comando[i]);  
+                }
 
-
+                strcat(tarefa," ");
+                strcat(tarefa,comando[i]);
+                i++;
+            }
+            printf("%s", transformacoes[0]);
+          //pendentes = adicionaTarefa(pid,atoi(comando[comandoSize - 1]),numeroTarefa,tarefa,pendentes);
+            if ((pid = fork()) == 0){
+                executar(comando [1], comando[2], transformacoes, comandoSize - 3);
+                _exit(0);
+            }
         }
           
         
