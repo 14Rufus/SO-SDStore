@@ -1,5 +1,5 @@
 //servidor
-
+//proc-file bla.txt bli.txt gcompress gdecompress
 #include <sys/wait.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -193,11 +193,13 @@ int executar(char* input,char* output,char** transf,int numTransf) {
                 case 0:
                     // codigo do filho 0
                     
+                    dup2(fd_input,p[i][0]);
                     close(p[i][0]);
+                    close(fd_input);
                     dup2(p[i][1],1);
                     close(p[i][1]);
 
-                    execlp(transf[i],transf[i],input,NULL);
+                    execlp(transf[i],transf[i],NULL);
 
                     _exit(0);
                 default:
@@ -214,9 +216,11 @@ int executar(char* input,char* output,char** transf,int numTransf) {
 
                     dup2(p[i-1][0],0);
                     close(p[i-1][0]);
+                    dup2(fd_output,p[i][1]);
+                    close(fd_output);
                     close(p[i][1]);
 
-                    execlp(transf[i],transf[i],output,NULL);
+                    execlp(transf[i],transf[i],NULL);
 
                     _exit(0);
                 default:
@@ -230,7 +234,7 @@ int executar(char* input,char* output,char** transf,int numTransf) {
                     return -1;
                 case 0:
                     // codigo do filho i
-
+                    close(p[i][0]);
                     dup2(p[i-1][0],0);
                     close(p[i-1][0]);
 
@@ -287,15 +291,12 @@ int main(int argc, char const *argv[]) {
         char** transformacoes = NULL; //<------ falta preencher mas preciso de perceber a estrutura faaaaaaaaaaaaaaaaaaaaaaaaaaaaack
         int pid;
 
-            printf("%s", comando[3]);
-            fflush(0);
-
         char* tarefa = malloc(1024 * sizeof(char));
             strcpy(tarefa,comando[0]);
             int i = 1;
             while(i < comandoSize) { // - 1 era o que dava mal
                 if(i > 2) {
-                    transformacoes = (char**) realloc(transformacoes, (i + 1) * sizeof(char*)); //1024
+                    transformacoes = (char**) realloc(transformacoes, (i + 1) * sizeof(char*)); //(i + 1) * sizeof(char*)
                     transformacoes[i - 3] = strdup(comando[i]);  
                 }
 
@@ -303,7 +304,7 @@ int main(int argc, char const *argv[]) {
                 strcat(tarefa,comando[i]);
                 i++;
             }
-            printf("%s", transformacoes[0]);
+
           //pendentes = adicionaTarefa(pid,atoi(comando[comandoSize - 1]),numeroTarefa,tarefa,pendentes);
             if ((pid = fork()) == 0){
                 executar(comando [1], comando[2], transformacoes, comandoSize - 3);
