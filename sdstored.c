@@ -1,5 +1,5 @@
 //servidor
-//proc-file bla.txt bli.txt gcompress gdecompress
+//proc-file teste.txt bli.txt gcompress gdecompress
 #include <sys/wait.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -147,8 +147,6 @@ void lerConfig(char* file) {
 
 
 int executar(char* input,char* output,char** transf,int numTransf) {
-    int fd_output = open(output, O_CREAT | O_WRONLY | O_TRUNC, 0600);
-    int fd_input = open(input, O_RDONLY);
     char* path = malloc(1024 * sizeof(char));
     strcpy(path,"SDStore-transf/");
 
@@ -161,6 +159,8 @@ int executar(char* input,char* output,char** transf,int numTransf) {
 
     if(numTransf == 1) {
         transf[0] = strcat(path,transf[0]);
+        int fd_output = open(output, O_CREAT | O_WRONLY | O_TRUNC, 0600);
+        int fd_input = open(input, O_RDONLY);
         dup2(fd_input,0);
         close(fd_input);
         dup2(fd_output,1);
@@ -172,32 +172,33 @@ int executar(char* input,char* output,char** transf,int numTransf) {
         return 0;
     }
 
-
-    // criar os pipes conforme o número de comandos
-    for (int i = 0; i < n-1; i++) {
-        if (pipe(p[i]) == -1) {
-            perror("Pipe não foi criado");
-            return -1;
-        }
-    }
-
+    //proc-file teste.txt bli.txt gcompress gdecompress
     // criar processos filhos para executar cada um dos comandos
     for (int i = 0; i < n; i++) {
-      transf[i] = strcat(path,transf[i]);
 
         if (i == 0) {
+            
+            if (pipe(p[i]) == -1) {
+                perror("Pipe não foi criado");
+                return -1;
+            }
+            
             switch(fork()) {
                 case -1:
                     perror("Fork não foi efetuado");
                     return -1;
                 case 0:
                     // codigo do filho 0
+                    transf[i] = strcat(path,transf[i]);
                     
-                    dup2(fd_input,p[i][0]);
                     close(p[i][0]);
-                    close(fd_input);
+
                     dup2(p[i][1],1);
                     close(p[i][1]);
+
+                    int fd_input = open(input, O_RDONLY);
+                    dup2(fd_input,0);
+                    close(fd_input);
 
                     execlp(transf[i],transf[i],NULL);
 
@@ -207,6 +208,7 @@ int executar(char* input,char* output,char** transf,int numTransf) {
             }
         }
         else if (i == n-1) {
+
             switch(fork()) {
                 case -1:
                     perror("Fork não foi efetuado");
@@ -214,11 +216,14 @@ int executar(char* input,char* output,char** transf,int numTransf) {
                 case 0:
                     // codigo do filho n-1
 
+                    
+                    transf[i] = strcat(path,transf[i]);
                     dup2(p[i-1][0],0);
                     close(p[i-1][0]);
-                    dup2(fd_output,p[i][1]);
+
+                    int fd_output = open(output, O_CREAT | O_WRONLY | O_TRUNC, 0600);
+                    dup2(fd_output,1);
                     close(fd_output);
-                    close(p[i][1]);
 
                     execlp(transf[i],transf[i],NULL);
 
@@ -228,12 +233,20 @@ int executar(char* input,char* output,char** transf,int numTransf) {
             }
         }
         else {
+
+            if (pipe(p[i]) == -1) {
+                perror("Pipe não foi criado");
+                return -1;
+            }
             switch(fork()) {
                 case -1:
                     perror("Fork não foi efetuado");
                     return -1;
                 case 0:
                     // codigo do filho i
+
+
+                    transf[i] = strcat(path,transf[i]);
                     close(p[i][0]);
                     dup2(p[i-1][0],0);
                     close(p[i-1][0]);
@@ -305,7 +318,10 @@ int main(int argc, char const *argv[]) {
                 i++;
             }
 
-          //pendentes = adicionaTarefa(pid,atoi(comando[comandoSize - 1]),numeroTarefa,tarefa,pendentes);
+            //pendentes = adicionaTarefa(pid,atoi(comando[comandoSize - 1]),numeroTarefa,tarefa,pendentes);
+
+            //proc-file teste.txt bli.txt gcompress gdecompress
+            // ver filhos -exec set follow-fork-mode child
             if ((pid = fork()) == 0){
                 executar(comando [1], comando[2], transformacoes, comandoSize - 3);
                 _exit(0);
