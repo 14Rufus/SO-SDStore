@@ -1,4 +1,6 @@
 all: server client
+			mkfifo bin/CanalClienteServidor
+			mkfifo bin/CanalServidorCliente
 
 server: bin/sdstored
 
@@ -18,3 +20,5 @@ obj/sdstore.o: src/sdstore.c
 
 clean:
 	rm obj/* tmp/* bin/{sdstore,sdstored}
+	unlink bin/CanalClienteServidor
+	unlink bin/CanalServidorCliente

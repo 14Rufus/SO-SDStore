@@ -284,6 +284,7 @@ int executar(char* transFolder ,char* input,char* output,char** transf,int numTr
 
 int main(int argc, char const *argv[]) {
 
+    int fdClienteServidor, fdServidorCliente, n;
 
     char *buffer = malloc(1024 * sizeof(char));
     char **comando;
@@ -292,20 +293,32 @@ int main(int argc, char const *argv[]) {
 
     lerConfig (argv[1]);
         
-    while (readln(0,buffer,sizeof(char) * 1024) ){
-        
-    
+    while (1){
+
+        while((fdClienteServidor = open("CanalClientServidor", O_RDONLY)) == -1){
+            perror("Error opening fifo1\n");
+        }
+
+        n = read(fdClienteServidor, buffer, 1024 * sizeof(char));
+        close(fdClienteServidor);
+
+
+        comandoSize = 0;
         comando = separaString(buffer);
 
-        /*if(!strcmp(comando[0], "status")) {
-                fd_fifo_server_client = open("server_client_pipe", O_WRONLY);
-                printLista(pendentes,fd_fifo_server_client);
-                printListaFiltros(listaFiltros,fd_fifo_server_client);
-                close(fd_fifo_server_client);
+        if(!strcmp(comando[0], "status")) {
+                fdServidorCliente = open("server_client_pipe", O_WRONLY);
+                printLista(pendentes,fdServidorCliente);
+                //printListaFiltros(listaFiltros,fd_fifo_server_client);
+                close(fdClienteServidor);
         } 
-        */
-        //else 
-        if(!strcmp(comando[0],"proc-file") ){
+        else if(!strcmp(comando[0], "info")) {
+            fdServidorCliente = open("server_client_pipe", O_WRONLY);
+            help(fdServidorCliente);
+            close(fdServidorCliente);
+        }
+
+        /*if(!strcmp(comando[0],"proc-file") ){
         
         char** transformacoes = NULL; //<------ falta preencher mas preciso de perceber a estrutura faaaaaaaaaaaaaaaaaaaaaaaaaaaaack
         int pid;
@@ -337,7 +350,7 @@ int main(int argc, char const *argv[]) {
         
         else help(1);
 
-    }
+    }*/
     return 0;
 }
 
