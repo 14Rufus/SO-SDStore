@@ -1,5 +1,7 @@
 //servidor
 //proc-file teste.txt bli.txt gcompress gdecompress
+//proc-file teste.txt pipe.txt gcompress gdecompress encrypt decrypt
+
 #include <sys/wait.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -84,8 +86,6 @@ char** separaString(char* buffer){
 
     int resultado = 0, i = 0;
 
-    ssize_t read_bytes = 0;
-
     while ((resultado = read (fd, &buffer[i], 1)) > 0 && i < size) {
         if (buffer[i] == '\n') {
             i += resultado;
@@ -123,18 +123,15 @@ ListaT adicionaT (int max, char* executavel,ListaT l) {
 
 void lerConfig(char* file) {
     char *buffer = malloc(1024 * sizeof(char));
-    char *filtro;
     char *exec;
     char *max;
     int fd_config = open(file, O_RDONLY);
-    int i = 0,n,o = 0,i2 = 0;
+    int n;
     char* token;
 
 
     while ((n = readln(fd_config,buffer,1024 * sizeof(char))) > 0) {
         token = strtok(buffer," ");
-        filtro = strdup(token);
-        token = strtok(NULL," ");
         exec = strdup(token);
         token = strtok(NULL," ");
         max = strdup(token);
@@ -146,9 +143,10 @@ void lerConfig(char* file) {
 
 
 
-int executar(char* input,char* output,char** transf,int numTransf) {
+
+int executar(char* transFolder ,char* input,char* output,char** transf,int numTransf) {
     char* path = malloc(1024 * sizeof(char));
-    strcpy(path,"SDStore-transf/");
+    strcpy(path, transFolder);
 
 //   printf("%d %d\n", fd_output, fd_input);
 
@@ -285,6 +283,9 @@ int main(int argc, char const *argv[]) {
     char *buffer = malloc(1024 * sizeof(char));
     char **comando;
 
+    char* transFolder = strdup(argv[1]);
+
+    lerConfig (argv[1]);
         
     while (readln(0,buffer,sizeof(char) * 1024) ){
         
@@ -323,7 +324,7 @@ int main(int argc, char const *argv[]) {
             //proc-file teste.txt bli.txt gcompress gdecompress
             // ver filhos -exec set follow-fork-mode child
             if ((pid = fork()) == 0){
-                executar(comando [1], comando[2], transformacoes, comandoSize - 3);
+                executar(argv[1], comando [1], comando[2], transformacoes, comandoSize - 3);
                 _exit(0);
             }
         }
