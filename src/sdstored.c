@@ -1,5 +1,7 @@
 //servidor
 //proc-file teste.txt bli.txt gcompress gdecompress
+
+//./bin/sdstored sdstored.conf bin/SDStore-transf/
 //proc-file teste.txt pipe.txt gcompress gdecompress encrypt decrypt
 
 #include <sys/wait.h>
@@ -121,7 +123,7 @@ ListaT adicionaT (int max, char* executavel,ListaT l) {
 
 
 
-void lerConfig(char* file) {
+void lerConfig(const char* file) {
     char *buffer = malloc(1024 * sizeof(char));
     char *exec;
     char *max;
@@ -276,6 +278,9 @@ int executar(char* transFolder ,char* input,char* output,char** transf,int numTr
 }
 
 
+//./bin/sdstored sdstored.conf bin/SDStore-transf/
+//proc-file teste.txt pipe.txt gcompress gdecompress encrypt decrypt
+
 
 int main(int argc, char const *argv[]) {
 
@@ -283,7 +288,7 @@ int main(int argc, char const *argv[]) {
     char *buffer = malloc(1024 * sizeof(char));
     char **comando;
 
-    char* transFolder = strdup(argv[1]);
+    char* transFolder = strdup(argv[2]);
 
     lerConfig (argv[1]);
         
@@ -324,7 +329,7 @@ int main(int argc, char const *argv[]) {
             //proc-file teste.txt bli.txt gcompress gdecompress
             // ver filhos -exec set follow-fork-mode child
             if ((pid = fork()) == 0){
-                executar(argv[1], comando [1], comando[2], transformacoes, comandoSize - 3);
+                executar(transFolder, comando [1], comando[2], transformacoes, comandoSize - 3);
                 _exit(0);
             }
         }
