@@ -11,7 +11,6 @@
 #include <fcntl.h>
 #include <stdlib.h>
 #include <sys/stat.h>
-//#include <errno.h>
 #include <time.h>
 #include <signal.h>
 
@@ -54,6 +53,10 @@ struct listaT {
 void help(int fdwr) {
     char help[] = "./sdstored status\n./sdstored proc-file input-filename output-filename transf-id-1 transf-id-2 ...\n";
     write(fdwr, help, sizeof(help));
+}
+
+void imprimef(int fdwr, char* str) {
+    write(fdwr, str, sizeof(str));
 }
 
 
@@ -308,19 +311,21 @@ int main(int argc, char const *argv[]) {
 
         if(!strcmp(comando[0], "status")) {
                 fdServidorCliente = open("server_client_pipe", O_WRONLY);
-                printLista(pendentes,fdServidorCliente);
+                //printLista(pendentes,fdServidorCliente);
                 //printListaFiltros(listaFiltros,fd_fifo_server_client);
                 close(fdClienteServidor);
         } 
+        
         else if(!strcmp(comando[0], "info")) {
             fdServidorCliente = open("server_client_pipe", O_WRONLY);
             help(fdServidorCliente);
             close(fdServidorCliente);
         }
 
-        /*if(!strcmp(comando[0],"proc-file") ){
+        else if(!strcmp(comando[0],"proc-file") ){
+        imprimef(fdServidorCliente, "pending");
         
-        char** transformacoes = NULL; //<------ falta preencher mas preciso de perceber a estrutura faaaaaaaaaaaaaaaaaaaaaaaaaaaaack
+        char** transformacoes = NULL; 
         int pid;
 
         char* tarefa = malloc(1024 * sizeof(char));
@@ -343,6 +348,7 @@ int main(int argc, char const *argv[]) {
             // ver filhos -exec set follow-fork-mode child
             if ((pid = fork()) == 0){
                 executar(transFolder, comando [1], comando[2], transformacoes, comandoSize - 3);
+
                 _exit(0);
             }
         }
@@ -350,8 +356,9 @@ int main(int argc, char const *argv[]) {
         
         else help(1);
 
-    }*/
+    }
     return 0;
 }
+
 
 

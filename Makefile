@@ -1,24 +1,37 @@
+#########################################################################################################
+CC = gcc 
+CFLAGS = -Wall -g -c -o
+CFLAGS1 = -g -o
+MKDIR = @mkdir -p
+#########################################################################################################
+
+
+
+#########################################################################################################
+
+
 all: server client
-			mkfifo bin/CanalClienteServidor
-			mkfifo bin/CanalServidorCliente
 
 server: bin/sdstored
 
 client: bin/sdstore
 
 bin/sdstored: obj/sdstored.o
-	gcc -g obj/sdstored.o -o bin/sdstored
+	${CC} ${CFLAGS1} $@ $^
 
 obj/sdstored.o: src/sdstored.c
-	gcc -Wall -g -c src/sdstored.c -o obj/sdstored.o
+	${CC} ${CFLAGS} $@ $^
 
 bin/sdstore: obj/sdstore.o
-	gcc -g obj/sdstore.o -o bin/sdstore
+	${CC} ${CFLAGS1} $@ $^
 
 obj/sdstore.o: src/sdstore.c
-	gcc -Wall -g -c src/sdstore.c -o obj/sdstore.o
+	${CC} ${CFLAGS} $@ $^
+
+setup:
+	${MKDIR} obj
+	${MKDIR} bin
+	${MKDIR} tmp
 
 clean:
-	rm obj/* tmp/* bin/{sdstore,sdstored}
-	unlink bin/CanalClienteServidor
-	unlink bin/CanalServidorCliente
+	@-rm obj/* tmp/* bin/*
