@@ -9,8 +9,7 @@
 #include <stdlib.h>
 #include <sys/stat.h>
 
-int fdClienteServidor;
-int fdServidorCliente;
+int fd_Clients_Server;
 
 char* itoa(int i){
     char const digit[] = "0123456789";
@@ -37,13 +36,17 @@ char* itoa(int i){
 int main (int argc, char** argv){
     char* buffer = malloc(sizeof(char) * 1024);
 
+    
 
+    char* fifo_name = itoa(getpid());
+    if (mkfifo(fifo_name, 0666))
+        perror("Mkfifo");
+    
+    
+    
     int i = 1;
 
-    if(i < argc) {
-        strcpy(buffer,argv[i]);
-        i++;
-    }
+    strcat(buffer,itoa(getpid()));
 
     while(i < argc) {
         strcat(buffer," ");
@@ -51,39 +54,26 @@ int main (int argc, char** argv){
         i++;
     }
 
-    strcat(buffer," ");
-    strcat(buffer,itoa(getpid()));
-
-
-    if ((fdClienteServidor = open("client_server_pipe", O_WRONLY)) == -1) {
+    
+    
+    if ((fd_Clients_Server = open("fifo_Clients_Server", O_WRONLY)) == -1) {
         perror("Error opening fifo\n");
         return -1;
     }
+    
+    write(fd_Clients_Server,buffer,sizeof(char)*strlen(buffer));
+    close(fd_Clients_Server);
 
-
-    if(argc == 1)
-        strcpy(buffer,"info");
-
-
-    write(fdClienteServidor,buffer,sizeof(char)*strlen(buffer));
-
-    close(fdClienteServidor);
-    int r;
-
-    if(argc > 4) {
-        sleep(100);
-        return 0;
-    }
-
-    fdServidorCliente = open("server_client_pipe", O_RDONLY);
 
     int n = 0;
-    while((n = read(fdServidorCliente,buffer,1024 * sizeof(char))) > 0){
-      write(1,buffer,n * sizeof(char));
-    }
-
+    int fdServidorCliente = open(fifo_name, O_RDONLY);
+    
+    while((n = read(fdServidorCliente,buffer,1024 * sizeof(char))) > 0)
+      write(1,buffer,n * sizeof(char)); 
+    
+    
+    
     close(fdServidorCliente);
-
-
+    unlink(fifo_name);
     return 0;
 }

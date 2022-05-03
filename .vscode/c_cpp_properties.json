@@ -11,7 +11,7 @@
             "cppStandard": "gnu++14",
             "intelliSenseMode": "linux-gcc-x64",
             "compilerArgs": [
-                "/bin/SDStore-transf/"
+                "proc-file teste.txt pipe.txt gcompress gdecompress encrypt decrypt"
             ]
         }
     ],

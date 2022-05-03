@@ -34,4 +34,4 @@ setup:
 	${MKDIR} tmp
 
 clean:
-	@-rm obj/* tmp/* bin/*
+	@-rm obj/* tmp/* bin/sdstore bin/sdstored

@@ -1,8 +1,8 @@
 //servidor
-//proc-file teste.txt bli.txt gcompress gdecompress
+//./bin/sdstore proc-file teste.txt bli.txt gcompress gdecompress
 
 //./bin/sdstored sdstored.conf bin/SDStore-transf/
-//proc-file teste.txt pipe.txt gcompress gdecompress encrypt decrypt
+//./bin/sdstore proc-file teste.txt pipe.txt gcompress gdecompress encrypt decrypt
 
 #include <sys/wait.h>
 #include <stdio.h>
@@ -29,14 +29,11 @@ int comandoSize = 0;
 int numeroTarefa = 1;
 
 
-
-
 //struct Pedidos
 struct listaP {
-  int pid;
-  int pidCliente;
   int numeroTarefa;
   char* tarefa;
+  char* OutFIFO;
   struct listaP *prox;
 };
 
@@ -49,6 +46,7 @@ struct listaT {
   int *pids;
   struct listaT *prox;
 };
+
 
 void help(int fdwr) {
     char help[] = "./sdstored status\n./sdstored proc-file input-filename output-filename transf-id-1 transf-id-2 ...\n";
@@ -65,12 +63,12 @@ char** separaString(char* buffer){
     char** comando = NULL;
     int nrComandos = 1;
     
-    for (int i = 0; buffer[i]!='\n'; i++)
+    for (int i = 0; buffer[i]!='\0'; i++)
     {
         if (buffer[i] == ' ') nrComandos++;
     }
 
-    buffer = strtok(buffer, "\n");
+    buffer = strtok(buffer, "\0");
     
     comando = (char**) realloc(comando, (nrComandos + 1) * sizeof(char*));
 
@@ -103,7 +101,7 @@ char** separaString(char* buffer){
     return i;
 }
 
-ListaT adicionaT (int max, char* executavel,ListaT l) {
+ListaT adicionaT(int max, char* executavel,ListaT l) {
     ListaT aux = l;
     ListaT new = malloc(sizeof(ListaT));
     new->max = max;
@@ -111,6 +109,26 @@ ListaT adicionaT (int max, char* executavel,ListaT l) {
     new->executavel = malloc(sizeof(char) * strlen(executavel));
     new->pids = malloc(sizeof(int)*max);
     strcpy(new->executavel,executavel);
+    new->prox = NULL;
+
+    if (!l) {
+        return new;
+    }
+
+    for (; aux->prox; aux = aux->prox);
+
+    aux->prox = new;
+
+    return l;
+}
+
+ListaP adicionaP (int max, char* tarefa, ListaP l) {
+    
+    ListaP aux = l;
+    ListaP new = malloc(sizeof(struct listaP));
+    new->numeroTarefa = numeroTarefa;
+    new->tarefa = malloc(sizeof(char) * strlen(tarefa));
+    strcpy(new->tarefa,tarefa);
     new->prox = NULL;
 
     if (!l) {
@@ -145,6 +163,7 @@ void lerConfig(const char* file) {
         listaTransf = adicionaT(atoi(max),exec,listaTransf);
     }
 }
+
 
 
 
@@ -281,60 +300,78 @@ int executar(char* transFolder ,char* input,char* output,char** transf,int numTr
 }
 
 
+int fdClienteServidor, fdServer_Server;
+
+void terminaServer(int signum){
+    
+    switch (signum){
+    case SIGQUIT:
+        close(fdServer_Server);
+        close(fdClienteServidor);
+        unlink("fifo_Clients_Server");
+        break;
+    }
+}
+
 //./bin/sdstored sdstored.conf bin/SDStore-transf/
 //proc-file teste.txt pipe.txt gcompress gdecompress encrypt decrypt
 
 
 int main(int argc, char const *argv[]) {
 
-    int fdClienteServidor, fdServidorCliente, n;
+
+    if (mkfifo("fifo_Clients_Server", 0666))
+        perror("Mkfifo");
+        
+    signal(SIGQUIT, terminaServer);
 
     char *buffer = malloc(1024 * sizeof(char));
     char **comando;
 
     char* transFolder = strdup(argv[2]);
 
-    lerConfig (argv[1]);
-        
-    while (1){
+    //lerConfig (argv[1]);
 
-        while((fdClienteServidor = open("CanalClientServidor", O_RDONLY)) == -1){
-            perror("Error opening fifo1\n");
+    if((fdClienteServidor = open("fifo_Clients_Server", O_RDONLY)) == -1){
+            perror("Error opening fifo_Clients_Server1\n");
         }
 
-        n = read(fdClienteServidor, buffer, 1024 * sizeof(char));
-        close(fdClienteServidor);
+    if ((fdServer_Server = open("fifo_Clients_Server", O_WRONLY)) == -1) {
+        perror("Error opening fifo_Clients_Server\n");
+        return -1;
+        }
 
+    while (read(fdClienteServidor, buffer, 1024 * sizeof(char)) > 0){
 
         comandoSize = 0;
         comando = separaString(buffer);
+        int fdServidorCliente = open(comando[0], O_WRONLY);
+        printf("%s\n", comando[0]);
 
-        if(!strcmp(comando[0], "status")) {
-                fdServidorCliente = open("server_client_pipe", O_WRONLY);
+        if(!strcmp(comando[1], "status")) {
+                
                 //printLista(pendentes,fdServidorCliente);
                 //printListaFiltros(listaFiltros,fd_fifo_server_client);
-                close(fdClienteServidor);
+                
         } 
         
-        else if(!strcmp(comando[0], "info")) {
-            fdServidorCliente = open("server_client_pipe", O_WRONLY);
+        else if(!strcmp(comando[1], "info")) {
             help(fdServidorCliente);
-            close(fdServidorCliente);
         }
 
-        else if(!strcmp(comando[0],"proc-file") ){
-        imprimef(fdServidorCliente, "pending");
+        else if(!strcmp(comando[1],"proc-file") ){
         
         char** transformacoes = NULL; 
-        int pid;
+        int pid = atoi(comando[0]);
 
         char* tarefa = malloc(1024 * sizeof(char));
             strcpy(tarefa,comando[0]);
             int i = 1;
+            
             while(i < comandoSize) { // - 1 era o que dava mal
-                if(i > 2) {
+                if(i > 3) {
                     transformacoes = (char**) realloc(transformacoes, (i + 1) * sizeof(char*)); //(i + 1) * sizeof(char*)
-                    transformacoes[i - 3] = strdup(comando[i]);  
+                    transformacoes[i - 4] = strdup(comando[i]);  
                 }
 
                 strcat(tarefa," ");
@@ -342,23 +379,26 @@ int main(int argc, char const *argv[]) {
                 i++;
             }
 
+            imprimef(fdServidorCliente, "pending\n");
             //pendentes = adicionaTarefa(pid,atoi(comando[comandoSize - 1]),numeroTarefa,tarefa,pendentes);
 
             //proc-file teste.txt bli.txt gcompress gdecompress
             // ver filhos -exec set follow-fork-mode child
             if ((pid = fork()) == 0){
-                executar(transFolder, comando [1], comando[2], transformacoes, comandoSize - 3);
-
+                executar(transFolder, comando [2], comando[3], transformacoes, comandoSize - 4);
+                imprimef(fdServidorCliente, "processing...\n");
+                
                 _exit(0);
             }
+            imprimef(fdServidorCliente, "Ta fixe\n");
         }
-          
         
-        else help(1);
+        close(fdServidorCliente);
 
     }
     return 0;
 }
+    
 
 
 
