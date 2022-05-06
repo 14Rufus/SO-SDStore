@@ -9,6 +9,8 @@
 #include <stdlib.h>
 #include <sys/stat.h>
 
+#define MAX_LINE_SIZE 1024
+
 int fd_Clients_Server;
 
 char* itoa(int i){
@@ -58,20 +60,21 @@ int main (int argc, char** argv){
     
     if ((fd_Clients_Server = open("fifo_Clients_Server", O_WRONLY)) == -1) {
         perror("Error opening fifo\n");
+        unlink(fifo_name);
         return -1;
     }
     
-    write(fd_Clients_Server,buffer,sizeof(char)*strlen(buffer));
+    write(fd_Clients_Server,buffer,MAX_LINE_SIZE);
     close(fd_Clients_Server);
 
 
     int n = 0;
     int fdServidorCliente = open(fifo_name, O_RDONLY);
     
-    while((n = read(fdServidorCliente,buffer,1024 * sizeof(char))) > 0)
-      write(1,buffer,n * sizeof(char)); 
-    
-    
+    while((n = read(fdServidorCliente,buffer,MAX_LINE_SIZE)) > 0){
+        write(1,buffer,n * sizeof(char)); 
+        memset(buffer,0,MAX_LINE_SIZE); //Limpa o espaço de memória das strings usadas
+    }
     
     close(fdServidorCliente);
     unlink(fifo_name);
