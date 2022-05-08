@@ -19,7 +19,6 @@
 //struct Pedidos
 typedef struct listaP *ListaP;
 
-
 //struct Transformações
 typedef struct listaT *ListaT;
 
@@ -28,14 +27,17 @@ ListaP pendentes = NULL;
 ListaP execucao = NULL;
 
 int comandoSize = 0;
-int numeroTarefa = 1;
+int nrTarefa = 1;
 
 
 //struct Pedidos
 struct listaP {
   int numeroTarefa;
-  char* tarefa;
-  char* OutFIFO;
+  int nrTransf;
+  char* input;
+  char* output;
+  char** transformacoes;
+  int fd_OutFIFO;
   struct listaP *prox;
 };
 
@@ -101,6 +103,51 @@ char** separaString(char* buffer){
     return i;
 }
 
+ListaP adicionaPedido(ListaP new, char* outFifo, ListaP l) {
+
+    int fd = open(outFifo, O_WRONLY);
+    write(fd, "pending\n", 9);
+    dup2(fd, new->fd_OutFIFO);
+    close(fd);
+
+    ListaP aux = l;
+    new->prox = NULL;
+
+    if (!l) {
+    return new;
+    }
+
+    for (; aux->prox; aux = aux->prox);
+
+    aux->prox = new;
+
+    return l;
+}
+
+ListaP novoProcFile(char** pedido, int comandoSize){
+    ListaP new = malloc(sizeof(struct listaP));
+    new->numeroTarefa = nrTarefa++;
+
+    
+    new->input = strdup(pedido[2]);
+    new->output = strdup(pedido[3]);
+    new->nrTransf = comandoSize - 4;
+    
+
+    new->transformacoes = NULL;
+    int i = 1;
+                        
+    while(i < comandoSize) { // - 1 era o que dava mal
+        if(i > 3) {
+            new->transformacoes = (char**) realloc(new->transformacoes, (i + 1) * sizeof(char*)); //(i + 1) * sizeof(char*)
+            new->transformacoes[i - 4] = strdup(pedido[i]);  
+        }
+        i++;
+    }
+
+    return new;
+}
+
 ListaT adicionaT(int max, char* executavel,ListaT l) {
     ListaT aux = l;
     ListaT new = malloc(sizeof(ListaT));
@@ -121,28 +168,6 @@ ListaT adicionaT(int max, char* executavel,ListaT l) {
 
     return l;
 }
-
-ListaP adicionaP (int max, char* tarefa, ListaP l) {
-    
-    ListaP aux = l;
-    ListaP new = malloc(sizeof(struct listaP));
-    new->numeroTarefa = numeroTarefa;
-    new->tarefa = malloc(sizeof(char) * strlen(tarefa));
-    strcpy(new->tarefa,tarefa);
-    new->prox = NULL;
-
-    if (!l) {
-        return new;
-    }
-
-    for (; aux->prox; aux = aux->prox);
-
-    aux->prox = new;
-
-    return l;
-}
-
-
 
 void lerConfig(const char* file) {
     char *buffer = malloc(1024 * sizeof(char));
@@ -337,6 +362,38 @@ char* itoa(int i){
 }
 
 
+void printListaPedidos(ListaP l, int fd) {
+  if(!l)
+    write(fd, "Não há tarefas em execução\n", 31);
+
+  else{
+    ListaP aux = l;
+    int primeiro = 0;
+    char buffer[1024];
+    for (; aux; aux = aux->prox) {
+      if (primeiro == 0) {
+        strcpy(buffer,"task #");
+        primeiro++;
+
+      } else
+        strcat(buffer,"task #");
+
+      strcat(buffer,itoa(aux->numeroTarefa));
+      strcat(buffer,": proc-file");
+      strcat(buffer,aux->input);
+      strcat(buffer," ");
+      strcat(buffer,aux->output);
+      for (int i = 0; i < aux->nrTransf; i++){
+        strcat(buffer," ");
+        strcat(buffer,aux->transformacoes[i]);
+      }
+      
+      strcat(buffer, "\n");
+    }
+    write(fd, buffer, strlen(buffer));
+  }
+}
+
 void printListaTransf(ListaT l, int fd) {
 
     ListaT aux = l;
@@ -358,6 +415,21 @@ void printListaTransf(ListaT l, int fd) {
       strcat(buffer, " (running/max)\n");
     }
     write(fd, buffer, MAX_LINE_SIZE);
+}
+
+
+\
+int transfDisponivel(ListaT l, ListaP pedido) {
+    ListaT aux = l;
+    int res = 0;
+    for (int i = 0; !res && (i < pedido->nrTransf); i++){
+        for (; aux && strcmp(aux->executavel,pedido->transformacoes[i]); aux = aux->prox);
+
+        if(aux && (aux->curr == aux->max))
+        res++;
+    }
+    
+    return res;
 }
 
 
@@ -395,59 +467,56 @@ int main(int argc, char const *argv[]) {
         comando = separaString(buffer);
         memset(buffer,0,MAX_LINE_SIZE); //Limpa o espaço de memória das strings usadas
         int pid;
-        int fdServidorCliente = open(comando[0], O_WRONLY);
-
+        
         if(!strcmp(comando[1], "status")) {
             if ((pid = fork()) == 0){
-            //printLista(pendentes,fdServidorCliente);
-            printListaTransf(listaTransf,fdServidorCliente);
+                int fdServidorCliente = open(comando[0], O_WRONLY);
+                printListaPedidos(pendentes,fdServidorCliente);
+                printListaTransf(listaTransf,fdServidorCliente);
+                close(fdServidorCliente);
+                _exit(0);
             }
                         
         } 
                 
         else if(!strcmp(comando[1], "info")) {
-            if ((pid = fork()) == 0) help(fdServidorCliente);
+                if ((pid = fork()) == 0) {
+                    int fdServidorCliente = open(comando[0], O_WRONLY);
+                    help(fdServidorCliente);
+                    close(fdServidorCliente);
+                    _exit(0);
+                }
             }
 
 
 
         else if(!strcmp(comando[1],"proc-file") ){
-            write(fdServidorCliente, "pending\n", 9);
-            //pendentes = adicionaTarefa(pid,atoi(comando[comandoSize - 1]),numeroTarefa,tarefa,pendentes);
+
+            ListaP new = novoProcFile(comando, comandoSize);
+            char* outFifo = strdup(comando[0]);
             
-            if ((pid = fork()) == 0){
-                printf("%s\n", comando[0]);                
-                
-                char** transformacoes = NULL; 
-                char* tarefa = malloc(1024 * sizeof(char));
-                strcpy(tarefa,comando[0]);
-                int i = 1;
-                    
-                    while(i < comandoSize) { // - 1 era o que dava mal
-                        if(i > 3) {
-                            transformacoes = (char**) realloc(transformacoes, (i + 1) * sizeof(char*)); //(i + 1) * sizeof(char*)
-                            transformacoes[i - 4] = strdup(comando[i]);  
-                        }
-
-                        strcat(tarefa," ");
-                        strcat(tarefa,comando[i]);
-                        i++;
-                    }
-
-                    
-
-                    //proc-file teste.txt bli.txt gcompress gdecompress
-                    // ver filhos -exec set follow-fork-mode child
-                        write(fdServidorCliente, "processing...\n", 15);
-                        executar(transFolder, comando [2], comando[3], transformacoes, comandoSize - 4);
-                        write(fdServidorCliente, "concluded\n", 11);
-                        _exit(0);
-                    
+            if (transfDisponivel(listaTransf, new))
+                pendentes = adicionaPedido(new, outFifo, pendentes);
+            
+            else if ((pid = fork()) == 0){
+                               
+                int fd = open(outFifo, O_WRONLY);
+                dup2(fd, new->fd_OutFIFO);
+                close(fd);
+                //proc-file teste.txt bli.txt gcompress gdecompress
+                // ver filhos -exec set follow-fork-mode child
+                write(new->fd_OutFIFO, "processing...\n", 15);
+                executar(transFolder, new->input, new->output, new->transformacoes, new->nrTransf);
+                write(new->fd_OutFIFO, "concluded\n", 11);
+                close(new->fd_OutFIFO);
+                free(new);
+                _exit(0);
                     
             }
 
         }
-        close(fdServidorCliente);
+
+        memset(buffer,0,MAX_LINE_SIZE); //Limpa o espaço de memória das strings usadas
     }
     return 0;
 }

@@ -70,11 +70,22 @@ int main (int argc, char** argv){
 
     int n = 0;
     int fdServidorCliente = open(fifo_name, O_RDONLY);
+    int pid;
+    int status;
     
-    while((n = read(fdServidorCliente,buffer,MAX_LINE_SIZE)) > 0){
-        write(1,buffer,n * sizeof(char)); 
-        memset(buffer,0,MAX_LINE_SIZE); //Limpa o espaço de memória das strings usadas
+    if((pid = fork()) == 0){
+        
+        while((n = read(fdServidorCliente,buffer,MAX_LINE_SIZE)) > 0){
+            write(1,buffer,n * sizeof(char));            
+            memset(buffer,0,MAX_LINE_SIZE); //Limpa o espaço de memória das strings usadas
+        }
+         close(fdServidorCliente);
+        _exit(0);
     }
+
+    
+
+    wait(&status);
     
     close(fdServidorCliente);
     unlink(fifo_name);
