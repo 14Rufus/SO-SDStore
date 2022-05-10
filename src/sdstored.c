@@ -28,7 +28,7 @@ ListaP execucao = NULL;
 
 int comandoSize = 0;
 int nrTarefa = 1;
-
+int fdClienteServidor, fdServer_Server;
 
 //struct Pedidos
 struct listaP {
@@ -103,12 +103,28 @@ char** separaString(char* buffer){
     return i;
 }
 
-ListaP adicionaPedido(ListaP new, char* outFifo, ListaP l) {
+ListaP adicionaPendente(ListaP new, char* outFifo, ListaP l) {
 
     int fd = open(outFifo, O_WRONLY);
     write(fd, "pending\n", 9);
     dup2(fd, new->fd_OutFIFO);
     close(fd);
+
+    ListaP aux = l;
+    new->prox = NULL;
+
+    if (!l) {
+    return new;
+    }
+
+    for (; aux->prox; aux = aux->prox);
+
+    aux->prox = new;
+
+    return l;
+}
+
+ListaP adicionaExecucao(ListaP new, ListaP l) {
 
     ListaP aux = l;
     new->prox = NULL;
@@ -193,28 +209,29 @@ void lerConfig(const char* file) {
 
 
 
-int executar(char* transFolder ,char* input,char* output,char** transf,int numTransf) {
+int executar(char* transFolder ,ListaP new) {
+    write(new->fd_OutFIFO, "processing...\n", 15);
     char* path = malloc(1024 * sizeof(char));
     strcpy(path, transFolder);
 
 //   printf("%d %d\n", fd_output, fd_input);
 
-    int n = numTransf;                         // número de comandos == número de filhos
+    int n = new->nrTransf;                         // número de comandos == número de filhos
     int p[n-1][2];                              // -> matriz com os fd's dos pipes
     int status[n];                              // -> array que guarda o return dos filhos
 
 
-    if(numTransf == 1) {
-        transf[0] = strcat(path,transf[0]);
-        int fd_output = open(output, O_CREAT | O_WRONLY | O_TRUNC, 0600);
-        int fd_input = open(input, O_RDONLY);
+    if(new->nrTransf == 1) {
+        new->transformacoes[0] = strcat(path,new->transformacoes[0]);
+        int fd_output = open(new->output, O_CREAT | O_WRONLY | O_TRUNC, 0600);
+        int fd_input = open(new->input, O_RDONLY);
         dup2(fd_input,0);
         close(fd_input);
         dup2(fd_output,1);
         close(fd_output);
     
         
-        execlp(transf[0],transf[0],NULL);
+        execlp(new->transformacoes[0],new->transformacoes[0],NULL);
 
         return 0;
     }
@@ -236,18 +253,18 @@ int executar(char* transFolder ,char* input,char* output,char** transf,int numTr
                     return -1;
                 case 0:
                     // codigo do filho 0
-                    transf[i] = strcat(path,transf[i]);
+                    new->transformacoes[i] = strcat(path,new->transformacoes[i]);
                     
                     close(p[i][0]);
 
                     dup2(p[i][1],1);
                     close(p[i][1]);
 
-                    int fd_input = open(input, O_RDONLY);
+                    int fd_input = open(new->input, O_RDONLY);
                     dup2(fd_input,0);
                     close(fd_input);
 
-                    execlp(transf[i],transf[i],NULL);
+                    execlp(new->transformacoes[i],new->transformacoes[i],NULL);
 
                     _exit(0);
                 default:
@@ -264,15 +281,15 @@ int executar(char* transFolder ,char* input,char* output,char** transf,int numTr
                     // codigo do filho n-1
 
                     
-                    transf[i] = strcat(path,transf[i]);
+                    new->transformacoes[i] = strcat(path,new->transformacoes[i]);
                     dup2(p[i-1][0],0);
                     close(p[i-1][0]);
 
-                    int fd_output = open(output, O_CREAT | O_WRONLY | O_TRUNC, 0600);
+                    int fd_output = open(new->output, O_CREAT | O_WRONLY | O_TRUNC, 0600);
                     dup2(fd_output,1);
                     close(fd_output);
 
-                    execlp(transf[i],transf[i],NULL);
+                    execlp(new->transformacoes[i],new->transformacoes[i],NULL);
 
                     _exit(0);
                 default:
@@ -293,7 +310,7 @@ int executar(char* transFolder ,char* input,char* output,char** transf,int numTr
                     // codigo do filho i
 
 
-                    transf[i] = strcat(path,transf[i]);
+                    new->transformacoes[i] = strcat(path,new->transformacoes[i]);
                     close(p[i][0]);
                     dup2(p[i-1][0],0);
                     close(p[i-1][0]);
@@ -302,7 +319,7 @@ int executar(char* transFolder ,char* input,char* output,char** transf,int numTr
                     close(p[i][1]);
 
 
-                    execlp(transf[i],transf[i],NULL);
+                    execlp(new->transformacoes[i],new->transformacoes[i],NULL);
 
                     _exit(0);
                 default:
@@ -321,11 +338,17 @@ int executar(char* transFolder ,char* input,char* output,char** transf,int numTr
             // printf("[PAI]: filho terminou com %d\n", WEXITSTATUS(status[i]));
         }
     }
+    write(new->fd_OutFIFO, "concluded\n", 11);
+
+    write(fdServer_Server, atoi(&new->numeroTarefa), sizeof(atoi(&new->numeroTarefa)));
+    close(new->fd_OutFIFO);
+    free(new);
+
     return 1;
 }
 
 
-int fdClienteServidor, fdServer_Server;
+
 
 void terminaServer(int signum){
     
@@ -432,6 +455,25 @@ int transfDisponivel(ListaT l, ListaP pedido) {
     return res;
 }
 
+void transfInc(ListaT l, char* transf) {
+    ListaT aux = l;
+    for (; aux && strcmp(aux->executavel,transf); aux = aux->prox);
+
+    if(aux && (aux->curr < aux->max)) {
+      aux->curr++;
+    }
+}
+
+void transfDec(ListaT l, char* transf) {
+    ListaT aux = l;
+    for (; aux && strcmp(aux->executavel,transf); aux = aux->prox);
+
+    if(aux && (aux->curr > 0)) {
+      aux->curr--;
+    }
+}
+
+
 
 //./bin/sdstored sdstored.conf bin/SDStore-transf/
 //proc-file teste.txt pipe.txt gcompress gdecompress encrypt decrypt
@@ -490,30 +532,75 @@ int main(int argc, char const *argv[]) {
 
 
 
-        else if(!strcmp(comando[1],"proc-file") ){
+        else if(!strcmp(comando[1],"proc-file")){
 
             ListaP new = novoProcFile(comando, comandoSize);
             char* outFifo = strdup(comando[0]);
+
             
             if (transfDisponivel(listaTransf, new))
-                pendentes = adicionaPedido(new, outFifo, pendentes);
-            
-            else if ((pid = fork()) == 0){
-                               
-                int fd = open(outFifo, O_WRONLY);
-                dup2(fd, new->fd_OutFIFO);
-                close(fd);
-                //proc-file teste.txt bli.txt gcompress gdecompress
-                // ver filhos -exec set follow-fork-mode child
-                write(new->fd_OutFIFO, "processing...\n", 15);
-                executar(transFolder, new->input, new->output, new->transformacoes, new->nrTransf);
-                write(new->fd_OutFIFO, "concluded\n", 11);
-                close(new->fd_OutFIFO);
-                free(new);
+                pendentes = adicionaPendente(new, outFifo, pendentes);
+                
+   
+            else {
+                
+                for(int t = 3; t < new->nrTransf; t++)
+                    transfInc(listaTransf,new->transformacoes[t]);
+
+
+                execucao = adicionaExecucao(new, execucao);
+
+                if ((pid = fork()) == 0){
+                    int fd = open(outFifo, O_WRONLY);
+                    dup2(fd,new->fd_OutFIFO);
+                    close(fd);
+                    //proc-file teste.txt bli.txt gcompress gdecompress
+                    // ver filhos -exec set follow-fork-mode child
+                    executar(transFolder, new);
+                    close(new->fd_OutFIFO);
+                
                 _exit(0);
-                    
+                }
+                
             }
 
+            
+        }
+        
+        else {
+            
+            int nrT = atoi(comando[0]); 
+            ListaP new = malloc(sizeof(struct listaP));
+            ListaP aux = malloc(sizeof(struct listaP));
+            aux->prox = execucao;
+
+            for (; aux->prox && nrT != aux->prox->numeroTarefa;aux = aux->prox );
+
+            new = aux->prox;
+            aux->prox = new->prox;
+            new->prox = NULL;
+
+            
+            
+
+            for(int t = 3; t < new->nrTransf; t++)
+                transfDec(listaTransf,new->transformacoes[t]);
+
+            
+            
+            if(pendentes){
+                new = pendentes;
+                pendentes = new->prox;
+                new->prox = NULL;
+
+                if (((pid = fork()) == 0) ){
+                    //proc-file teste.txt bli.txt gcompress gdecompress
+                    // ver filhos -exec set follow-fork-mode child
+                    executar(transFolder, new);
+                    _exit(0);
+                }
+                
+            }
         }
 
         memset(buffer,0,MAX_LINE_SIZE); //Limpa o espaço de memória das strings usadas
