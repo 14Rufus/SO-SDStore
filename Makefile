@@ -31,7 +31,6 @@ obj/sdstore.o: src/sdstore.c
 setup:
 	${MKDIR} obj
 	${MKDIR} bin
-	${MKDIR} tmp
 
 clean:
-	@-rm obj/* tmp/* bin/sdstore bin/sdstored
+	@-rm obj/* bin/sdstore bin/sdstored

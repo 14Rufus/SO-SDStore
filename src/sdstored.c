@@ -412,7 +412,7 @@ int fdClienteServidor, fdServer_Server;
 
 void help(int fdwr) {
     char* help = "./sdstored status\n./sdstored proc-file input-filename output-filename transf-id-1 transf-id-2 ...\n";
-    write(fdwr, help, MAX_LINE_SIZE);
+    write(fdwr, help, sizeof(char)*99);
 }
 
 ssize_t readln (int fd, char *buffer, size_t size) {
@@ -485,30 +485,33 @@ int executar(char* transFolder, Tarefa* new) {
     int status[n];                              // -> array que guarda o return dos filhos
     //int size_input, size_output;
 
+        
+
     if(new->nrTransf == 1) {
         int pid;
         
-        char* tarnsformacao = strdup(listaTransf[new->transformations[0]]->executavel);
+
+        if ((pid = fork()) == 0){
+
+          char* tarnsformacao = strdup(listaTransf[new->transformations[0]]->executavel);
         
-        tarnsformacao = strcat(path,tarnsformacao);
+          tarnsformacao = strcat(path,tarnsformacao);
 
-        int fd_output = open(new->output, O_CREAT | O_WRONLY | O_TRUNC, 0666);
-        int fd_input = open(new->input, O_RDONLY);
-        dup2(fd_input,0);
-        close(fd_input);
-        dup2(fd_output,1);
-        close(fd_output);
-    
-        
-        if ((pid = fork()) == 0) execlp(tarnsformacao,tarnsformacao,NULL);
+          int fd_output = open(new->output, O_CREAT | O_WRONLY | O_TRUNC, 0666);
+          int fd_input = open(new->input, O_RDONLY);
+          dup2(fd_output,1);
+          close(fd_output);
+          dup2(fd_input,0);
+          close(fd_input);
+          execlp(tarnsformacao,tarnsformacao,NULL);
+          _exit(0);
+        }
+          
+        wait(&status[0]);
 
-        Message m = mensagemConcluded(new->nrTarefa);
-
-        write(new->fd, "concluded\n", 11);
-
-        write(fdServer_Server, &m, sizeof(Message));
-        close(fdServer_Server);
-        
+        if (WIFEXITED(status[0])) {
+              // printf("[PAI]: filho terminou com %d\n", WEXITSTATUS(status[i]));
+        }
 
       
     } else {
@@ -572,6 +575,8 @@ int executar(char* transFolder, Tarefa* new) {
 
                       execlp(tarnsformacao,tarnsformacao,NULL);
 
+                      
+
                       _exit(0);
                   default:
                       close(p[i-1][0]);
@@ -621,10 +626,12 @@ int executar(char* transFolder, Tarefa* new) {
               // printf("[PAI]: filho terminou com %d\n", WEXITSTATUS(status[i]));
           }
       }
+
     }
     
 
     write(new->fd, "concluded\n", 11);
+    close(new->fd);
 
     Message m = mensagemConcluded(new->nrTarefa);
 
@@ -812,10 +819,6 @@ int main(int argc, char const *argv[]) {
 
                 adicionaExecucao(new, execucao);
                 
-
-
-
-
                 if ((pid = fork()) == 0){
                     int fd = open(itoa(new->fd_outFIFO), O_WRONLY);
                     dup2(fd, new->fd);
@@ -823,7 +826,6 @@ int main(int argc, char const *argv[]) {
                     //proc-file teste.txt bli.txt gcompress gdecompress
                     // ver filhos -exec set follow-fork-mode child
                     executar(transFolder, new);
-                    close(new->fd);
                     
                     exit(0);
                 }
@@ -864,7 +866,6 @@ int main(int argc, char const *argv[]) {
                     //proc-file teste.txt bli.txt gcompress gdecompress
                     // ver filhos -exec set follow-fork-mode child
                     executar(transFolder, node.task);
-                    close(task->fd);
                     _exit(0);
                 }
                 
