@@ -483,7 +483,7 @@ int executar(char* transFolder, Tarefa* new) {
     int n = new->nrTransf;                       // número de comandos == número de filhos
     int p[n-1][2];                              // -> matriz com os fd's dos pipes
     int status[n];                              // -> array que guarda o return dos filhos
-    //int size_input, size_output;
+    int size_input, size_output;
 
         
 
@@ -630,7 +630,20 @@ int executar(char* transFolder, Tarefa* new) {
     }
     
 
-    write(new->fd, "concluded\n", 11);
+    int fd_input = open(new->input, O_RDONLY);
+    int fd_output = open(new->output, O_RDONLY);
+
+    size_input = lseek(fd_input, 0, SEEK_END);
+    size_output = lseek(fd_output, 0, SEEK_END);
+
+    char buffer[1024];
+    
+    strcpy(buffer,"concluded (bytes-input: ");
+    strcat(buffer, itoa(size_input));
+    strcat(buffer, ", bytes-output: ");
+    strcat(buffer, itoa(size_output));
+    strcat(buffer, ")\n");
+    write(new->fd, buffer, 46 * sizeof(char));
     close(new->fd);
 
     Message m = mensagemConcluded(new->nrTarefa);
