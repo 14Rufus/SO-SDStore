@@ -216,7 +216,6 @@ void* node_getEstruturaAVL(struct Node* node, int value)
 }
 
 
-
 // Delete a nodes
 struct Node *deleteNodeAVL(struct Node *root, int key, void* task) {
   // Find the node and delete it
@@ -384,19 +383,22 @@ void heapify(minHeap *hp, int i) {
     }
 }
 
-minNode deleteNode(minHeap *hp) {
-    minNode node = hp->elem[0];
+minHeap* deleteNode(minHeap *hp) {
 
     if(hp->size) {
-        hp->elem[0] = hp->elem[--(hp->size)] ;
-        hp->elem = realloc(hp->elem, hp->size * sizeof(minNode)) ;
-        heapify(hp, 0) ;
+        hp->elem[0] = hp->elem[--(hp->size)];
+        hp->elem = realloc(hp->elem, hp->size * sizeof(minNode));
+        heapify(hp, 0);
     } else {
-        free(hp->elem) ;
+        free(hp->elem);
     }
 
-    return node;
+    return hp;
 
+}
+
+void* node_getEstruturaMinH (minHeap* hp){
+  return (hp->elem->task);
 }
 
 #define MAX_LINE_SIZE 1024
@@ -643,7 +645,11 @@ int executar(char* transFolder, Tarefa* new) {
     strcat(buffer, ", bytes-output: ");
     strcat(buffer, itoa(size_output));
     strcat(buffer, ")\n");
-    write(new->fd, buffer, 46 * sizeof(char));
+    strcat(buffer, "\0");
+    int i;
+    for (i=0; buffer [i] != '\0'; i++){
+    }
+    write(new->fd, buffer, i * sizeof(char));
     close(new->fd);
 
     Message m = mensagemConcluded(new->nrTarefa);
@@ -735,8 +741,7 @@ int transfDisponivel(Transform** l, Tarefa* tarefa) {
     int res = 0;
     for (int i = 0; !res && (i < tarefa->nrTransf); i++){
 
-        if((l[tarefa->transformations[i]]->curr == l[tarefa->transformations[i]]->max))
-        res++;
+        if((l[tarefa->transformations[i]]->curr == l[tarefa->transformations[i]]->max)) res++;
     }
     
     return res;
@@ -745,7 +750,7 @@ int transfDisponivel(Transform** l, Tarefa* tarefa) {
 Transform** transfInc(Transform** l, int transf) {
     if(l[transf]->curr < l[transf]->max) {
       l[transf]->curr+= 1;
-    }
+    }  
     return l;
 }
 
@@ -851,14 +856,17 @@ int main(int argc, char const *argv[]) {
         
         else if(buffer.type == END){
             int nrT = buffer.pid;
+            sleep(10);
             
             Tarefa* task = malloc(sizeof(struct tarefa));
 
             task = node_getEstruturaAVL(execucao, nrT);
-
             execucao = deleteNodeAVL(execucao, nrT, task);
+/*             printf("é aqui 0\n");
+            fflush(0);
+ */
 
-            printf("%d -> %s-> %s-> %s\n", task->nrTransf, task->input, task->output, listaTransf[task->transformations[0]]->executavel);
+            printf("%d -> %s-> %s-> %d\n", task->nrTransf, task->input, task->output, listaTransf[task->transformations[0]]->curr);
                 fflush(0);
 
             
@@ -866,20 +874,39 @@ int main(int argc, char const *argv[]) {
             for(int t = 0; t < task->nrTransf; t++)
                 transfDec(listaTransf,task->transformations[t]);
             
-            
-            
-            
-            if(pendentes->size > 0){
-              
-                minNode node = deleteNode(pendentes);
-                task = node.task;
-                
+/*                 printf("é aqui 1\n");
+                fflush(0);
+ */            
+/*                 printf("%d\n", pendentes->size);
+                fflush(0);
+ */
+/*             printf("é aqui 2\n");
+            fflush(0);
+ */            if(pendentes->size > 0){
+              // if(pendentes){}
 
-                if (((pid = fork()) == 0) ){
+/*                 printf("%d\n", pendentes->size);
+                fflush(0);
+ */
+                task = node_getEstruturaMinH (pendentes);
+
+                if (transfDisponivel(listaTransf, task))
+                  adicionaPendente(task, task->fd_outFIFO, pendentes);
+                else {
+                  pendentes = deleteNode(pendentes);
+
+                  for(int t = 0; t < task->nrTransf; t++)
+                      listaTransf = transfInc(listaTransf,task->transformations[t]);
+
+                  adicionaExecucao(task, execucao);
+
+                  if (((pid = fork()) == 0) ){
                     //proc-file teste.txt bli.txt gcompress gdecompress
                     // ver filhos -exec set follow-fork-mode child
-                    executar(transFolder, node.task);
+                    executar(transFolder, task);
                     _exit(0);
+                  }
+                  close(task->fd);
                 }
                 
             }
@@ -890,5 +917,3 @@ int main(int argc, char const *argv[]) {
     
     return 0;
 }
-
-
