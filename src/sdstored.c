@@ -670,7 +670,6 @@ void terminaServer(int signum){
     switch (signum){
     case SIGQUIT:
         close(fdServer_Server);
-
         
         unlink("fifo_Clients_Server");
         
@@ -856,7 +855,6 @@ int main(int argc, char const *argv[]) {
         
         else if(buffer.type == END){
             int nrT = buffer.pid;
-            sleep(10);
             
             Tarefa* task = malloc(sizeof(struct tarefa));
 

@@ -1,5 +1,4 @@
 //cliente
-//bue da codigo
 
 #include <sys/wait.h>
 #include <stdio.h>
