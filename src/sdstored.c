@@ -679,7 +679,7 @@ void terminaServer(int signum){
 }
 
 
-/*void printListaPedidos(minHeap* l, int fd) {
+void printListaPedidos(minHeap* l, int fd) {
   if(l->size == 0)
     write(fd, "Não há tarefas em execução\n", 31);
 
@@ -693,23 +693,25 @@ void terminaServer(int signum){
         primeiro++;
 
       } else {strcat(buffer,"task #");}
+        Tarefa* task = malloc(sizeof(Tarefa));
+        task = l->elem[i].task;
         
-        strcat(buffer,itoa(l->elem->task.nrTarefa));
+        strcat(buffer,itoa(task->nrTarefa));
         strcat(buffer,": proc-file");
-        strcat(buffer,l->elem->task.input);
+        strcat(buffer,task->input);
         strcat(buffer," ");
-        strcat(buffer,l->elem->task.output);
+        strcat(buffer,task->output);
         
-        for (int j = 0; j < l->elem->task.nrTransf; j++){
+        for (int j = 0; j < task->nrTransf; j++){
             strcat(buffer," ");
-            strcat(buffer,listaTransf[l->elem->task.transformations[j]]->executavel);
+            strcat(buffer,listaTransf[task->transformations[j]]->executavel);
         }
         
         strcat(buffer, "\n");
     }
     write(fd, buffer, strlen(buffer));
   }
-}*/
+}
 
 void printListaTransf(Transform** l, int fd) {
 
@@ -800,7 +802,7 @@ int main(int argc, char const *argv[]) {
         if(buffer.type == STATUS) {
             if ((pid = fork()) == 0){
                 int fdServidorCliente = open(itoa(buffer.pid), O_WRONLY);
-                //printListaPedidos(pendentes,fdServidorCliente);
+                printListaPedidos(pendentes,fdServidorCliente);
                 printListaTransf(listaTransf,fdServidorCliente);
                 close(fdServidorCliente);
                 _exit(0);
@@ -864,8 +866,8 @@ int main(int argc, char const *argv[]) {
             fflush(0);
  */
 
-            printf("%d -> %s-> %s-> %d\n", task->nrTransf, task->input, task->output, listaTransf[task->transformations[0]]->curr);
-                fflush(0);
+            /* printf("%d -> %s-> %s-> %d\n", task->nrTransf, task->input, task->output, listaTransf[task->transformations[0]]->curr);
+                fflush(0); */
 
             
 
