@@ -25,36 +25,16 @@
 
 typedef struct message
 { 
-  int pid;
-  int rep;
-	int type;
-  int priority;
+    int pid;
+    int type;
+    int priority;
 	char input[20];
-  char output[20];
-  int nrTransf;
-  int transformations[20];
+    char output[20];
+    int nrTransf;
+    int transformations[20];
 
 } Message;
 
-
-typedef struct tarefa
-{ 
-  int nrTarefa; 
-  int fd_outFIFO;
-  int timeStamp;
-	char* input;
-  char* output;
-  int nrTransf;
-  int transformations[20];
-
-} Tarefa;
-
-typedef struct transform 
-{
-  int max;
-  int curr; //current
-  char* executavel;
-} Transform;
 
 char* itoa(int i){
     char const digit[] = "0123456789";
@@ -80,7 +60,6 @@ char* itoa(int i){
 
 Message novoMessage(char** pedido, int comandoSize){
     Message new;
-    new.rep = 0;
     
     if (!strcmp(pedido[1], "status")){
         new.type = STATUS;
@@ -140,24 +119,17 @@ Message novoMessage(char** pedido, int comandoSize){
         new.nrTransf = comandoSize-a;
 
     }
-    
-
     return new;
 }
 
-
 int fd_Clients_Server;
-
 
 int main (int argc, char** argv){
     char* buffer = malloc(sizeof(char) * 1024);
 
-    
-
     char* fifo_name = itoa(getpid());
     if (mkfifo(fifo_name, 0666))
         perror("Mkfifo");
-    
     
     if ((fd_Clients_Server = open("fifo_Clients_Server", O_WRONLY)) == -1) {
         perror("Error opening fifo\n");
@@ -165,14 +137,12 @@ int main (int argc, char** argv){
         return -1;
     }
 
-
     Message new = novoMessage(argv, argc);
 
     new.pid = getpid();
 
     write(fd_Clients_Server, &new, sizeof(Message));
     close(fd_Clients_Server);
-
 
     int n = 0;
     int fdServidorCliente = open(fifo_name, O_RDONLY);
@@ -188,12 +158,8 @@ int main (int argc, char** argv){
          close(fdServidorCliente);
         _exit(0);
     }
-
-    
-    
     wait(&status);
     close(fdServidorCliente);
-    
     
     unlink(fifo_name);
     return 0;

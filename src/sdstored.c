@@ -1,8 +1,4 @@
 //servidor
-//./bin/sdstore proc-file teste.txt bli.txt gcompress gdecompress
-
-//./bin/sdstored sdstored.conf bin/SDStore-transf/
-//./bin/sdstore proc-file teste.txt pipe.txt gcompress gdecompress encrypt decrypt
 
 #include <sys/wait.h>
 #include <stdio.h>
@@ -33,7 +29,7 @@ typedef struct tarefa
   int fd_outFIFO;
   int fd;
   int timeStamp;
-	char* input;
+  char* input;
   char* output;
   int nrTransf;
   int transformations[20];
@@ -51,7 +47,6 @@ typedef struct Node {
 typedef struct message
 { 
   int pid;
-  int rep;
 	int type;
   int priority;
 	char input[20];
@@ -205,7 +200,6 @@ void* node_getEstruturaAVL(struct Node* node, int value)
         return NULL;
     else
     {
-        
         if (value == node->key)
             return node->task;
         else if (value < node->key)
@@ -384,7 +378,6 @@ void heapify(minHeap *hp, int i) {
 }
 
 minHeap* deleteNode(minHeap *hp) {
-
     if(hp->size) {
         hp->elem[0] = hp->elem[--(hp->size)];
         hp->elem = realloc(hp->elem, hp->size * sizeof(minNode));
@@ -394,7 +387,6 @@ minHeap* deleteNode(minHeap *hp) {
     }
 
     return hp;
-
 }
 
 void* node_getEstruturaMinH (minHeap* hp){
@@ -426,15 +418,12 @@ ssize_t readln (int fd, char *buffer, size_t size) {
             i += resultado;
             return i;
         }
-
         i += resultado;
     }
-
     return i;
 }
 
 void adicionaPendente(Tarefa* new, int outFifo, minHeap* l) {
-
     int fd = open(itoa(outFifo), O_WRONLY);
     write(fd, "pending\n", 9);
     dup2(fd, new->fd);
@@ -444,7 +433,6 @@ void adicionaPendente(Tarefa* new, int outFifo, minHeap* l) {
 }
 
 void adicionaExecucao(Tarefa* task, Node l) {
-
     insertNodeAVL(l, task->nrTarefa, task);
 }
 
@@ -463,41 +451,28 @@ void lerConfig(const char* file) {
         exec = strdup(token);
         token = strtok(NULL," ");
         max = strdup(token);
-
-        //printf("%s %s %s\n", filtro,exec,max);
         listaTransf = adicionaT(atoi(max), exec, i, listaTransf);
         i++;
     }
-
     close(fd_config);
 }
-
-
-
-
 
 int executar(char* transFolder, Tarefa* new) {
     write(new->fd, "processing...\n", 15);
     char* path = malloc(1024 * sizeof(char));
     strcpy(path, transFolder);
-    //printf("%d %d\n", fd_output, fd_input);
-
-    int n = new->nrTransf;                       // número de comandos == número de filhos
+    int n = new->nrTransf;                      // número de comandos == número de filhos
     int p[n-1][2];                              // -> matriz com os fd's dos pipes
     int status[n];                              // -> array que guarda o return dos filhos
     int size_input, size_output;
 
-        
-
     if(new->nrTransf == 1) {
         int pid;
-        
 
         if ((pid = fork()) == 0){
-
-          char* tarnsformacao = strdup(listaTransf[new->transformations[0]]->executavel);
+          char* transformacao = strdup(listaTransf[new->transformations[0]]->executavel);
         
-          tarnsformacao = strcat(path,tarnsformacao);
+          transformacao = strcat(path,transformacao);
 
           int fd_output = open(new->output, O_CREAT | O_WRONLY | O_TRUNC, 0666);
           int fd_input = open(new->input, O_RDONLY);
@@ -505,21 +480,14 @@ int executar(char* transFolder, Tarefa* new) {
           close(fd_output);
           dup2(fd_input,0);
           close(fd_input);
-          execlp(tarnsformacao,tarnsformacao,NULL);
+          execlp(transformacao,transformacao,NULL);
           _exit(0);
         }
           
         wait(&status[0]);
-
-        if (WIFEXITED(status[0])) {
-              // printf("[PAI]: filho terminou com %d\n", WEXITSTATUS(status[i]));
-        }
-
       
     } else {
 
-      //proc-file teste.txt bli.txt gcompress gdecompress
-      // criar processos filhos para executar cada um dos comandos
       for (int i = 0; i < n; i++) {
 
           if (i == 0) {
@@ -535,9 +503,9 @@ int executar(char* transFolder, Tarefa* new) {
                       return -1;
                   case 0: ;
                       // codigo do filho 0
-                      char* tarnsformacao = strdup(listaTransf[new->transformations[i]]->executavel);
+                      char* transformacao = strdup(listaTransf[new->transformations[i]]->executavel);
           
-                      tarnsformacao = strcat(path,tarnsformacao);
+                      transformacao = strcat(path,transformacao);
                       
                       close(p[i][0]);
 
@@ -548,7 +516,7 @@ int executar(char* transFolder, Tarefa* new) {
                       dup2(fd_input,0);
                       close(fd_input);
 
-                      execlp(tarnsformacao,tarnsformacao,NULL);
+                      execlp(transformacao,transformacao,NULL);
 
                       _exit(0);
                   default:
@@ -563,11 +531,9 @@ int executar(char* transFolder, Tarefa* new) {
                       return -1;
                   case 0: ;
                       // codigo do filho n-1
-
-                      
-                      char* tarnsformacao = strdup(listaTransf[new->transformations[i]]->executavel);
+                      char* transformacao = strdup(listaTransf[new->transformations[i]]->executavel);
           
-                      tarnsformacao = strcat(path,tarnsformacao);
+                      transformacao = strcat(path,transformacao);
                       dup2(p[i-1][0],0);
                       close(p[i-1][0]);
 
@@ -575,9 +541,7 @@ int executar(char* transFolder, Tarefa* new) {
                       dup2(fd_output,1);
                       close(fd_output);
 
-                      execlp(tarnsformacao,tarnsformacao,NULL);
-
-                      
+                      execlp(transformacao,transformacao,NULL);
 
                       _exit(0);
                   default:
@@ -596,11 +560,9 @@ int executar(char* transFolder, Tarefa* new) {
                       return -1;
                   case 0: ;
                       // codigo do filho i
-
-
-                      char* tarnsformacao = strdup(listaTransf[new->transformations[i]]->executavel);
+                      char* transformacao = strdup(listaTransf[new->transformations[i]]->executavel);
           
-                      tarnsformacao = strcat(path,tarnsformacao);
+                      transformacao = strcat(path,transformacao);
                       close(p[i][0]);
                       dup2(p[i-1][0],0);
                       close(p[i-1][0]);
@@ -608,8 +570,7 @@ int executar(char* transFolder, Tarefa* new) {
                       dup2(p[i][1],1);
                       close(p[i][1]);
 
-
-                      execlp(tarnsformacao,tarnsformacao,NULL);
+                      execlp(transformacao,transformacao,NULL);
 
                       _exit(0);
                   default:
@@ -623,14 +584,9 @@ int executar(char* transFolder, Tarefa* new) {
       for (int i = 0; i < n; i++)
       {
           wait(&status[i]);
-
-          if (WIFEXITED(status[i])) {
-              // printf("[PAI]: filho terminou com %d\n", WEXITSTATUS(status[i]));
-          }
       }
 
     }
-    
 
     int fd_input = open(new->input, O_RDONLY);
     int fd_output = open(new->output, O_RDONLY);
@@ -656,24 +612,15 @@ int executar(char* transFolder, Tarefa* new) {
 
     write(fdServer_Server, &m, sizeof(struct message));
     close(fdServer_Server);
-    
-    
 
     return 1;
 }
 
-
-
-
 void terminaServer(int signum){
-    
     switch (signum){
     case SIGQUIT:
         close(fdServer_Server);
-        
         unlink("fifo_Clients_Server");
-        
-        
         break;
     }
 }
@@ -706,7 +653,6 @@ void printListaPedidos(minHeap* l, int fd) {
             strcat(buffer," ");
             strcat(buffer,listaTransf[task->transformations[j]]->executavel);
         }
-        
         strcat(buffer, "\n");
     }
     write(fd, buffer, strlen(buffer));
@@ -714,37 +660,30 @@ void printListaPedidos(minHeap* l, int fd) {
 }
 
 void printListaTransf(Transform** l, int fd) {
-
-
     char* buffer = malloc(MAX_LINE_SIZE);
     for (int i=0; i< 7;i++) {
 
       if (i == 0) {
         strcpy(buffer,"transf ");
       }
-      
-      else {strcat(buffer,"transf ");}
 
+      else {strcat(buffer,"transf ");}
         strcat(buffer,l[i]->executavel);
         strcat(buffer,": ");
         strcat(buffer,itoa(l[i]->curr));
         strcat(buffer,"/");
         strcat(buffer,itoa(l[i]->max));
         strcat(buffer, " (running/max)\n");
-        
     }
     write(fd, buffer, MAX_LINE_SIZE);
 }
 
-
-\
 int transfDisponivel(Transform** l, Tarefa* tarefa) {
     int res = 0;
     for (int i = 0; !res && (i < tarefa->nrTransf); i++){
 
         if((l[tarefa->transformations[i]]->curr == l[tarefa->transformations[i]]->max)) res++;
     }
-    
     return res;
 }
 
@@ -762,15 +701,7 @@ Transform** transfDec(Transform** l, int transf) {
     return l;
 }
 
-
-
-//./bin/sdstored sdstored.conf bin/SDStore-transf/
-//proc-file teste.txt pipe.txt gcompress gdecompress encrypt decrypt
-
-
 int main(int argc, char const *argv[]) {
-
-    
     struct Node *execucao = malloc(sizeof(struct Node));
     minHeap* pendentes = initMinHeap();
 
@@ -796,7 +727,6 @@ int main(int argc, char const *argv[]) {
         }
 
     while (read(fdClienteServidor, &buffer,sizeof(Message))){
-        //memset(&buffer,0,MAX_LINE_SIZE); //Limpa o espaço de memória das strings usadas
         int pid;
         
         if(buffer.type == STATUS) {
@@ -819,8 +749,6 @@ int main(int argc, char const *argv[]) {
                 }
             }
 
-
-
         else if(buffer.type == PROCFILE){
 
             Tarefa* new = novaTarefa(buffer, tStamp, nrTarefa);
@@ -829,7 +757,6 @@ int main(int argc, char const *argv[]) {
             
             if (transfDisponivel(listaTransf, new))
                 adicionaPendente(new, new->fd_outFIFO, pendentes);
-                
             
             else {
                 
@@ -842,17 +769,10 @@ int main(int argc, char const *argv[]) {
                     int fd = open(itoa(new->fd_outFIFO), O_WRONLY);
                     dup2(fd, new->fd);
                     close(fd);
-                    //proc-file teste.txt bli.txt gcompress gdecompress
-                    // ver filhos -exec set follow-fork-mode child
                     executar(transFolder, new);
-                    
                     exit(0);
                 }
-
-                
-            }
-
-            
+            }            
         }
         
         else if(buffer.type == END){
@@ -862,58 +782,35 @@ int main(int argc, char const *argv[]) {
 
             task = node_getEstruturaAVL(execucao, nrT);
             execucao = deleteNodeAVL(execucao, nrT, task);
-/*             printf("é aqui 0\n");
-            fflush(0);
- */
-
-            /* printf("%d -> %s-> %s-> %d\n", task->nrTransf, task->input, task->output, listaTransf[task->transformations[0]]->curr);
-                fflush(0); */
-
             
-
             for(int t = 0; t < task->nrTransf; t++)
                 transfDec(listaTransf,task->transformations[t]);
-            
-/*                 printf("é aqui 1\n");
-                fflush(0);
- */            
-/*                 printf("%d\n", pendentes->size);
-                fflush(0);
- */
-/*             printf("é aqui 2\n");
-            fflush(0);
- */            if(pendentes->size > 0){
-              // if(pendentes){}
+                
+            if(pendentes->size > 0){
 
-/*                 printf("%d\n", pendentes->size);
-                fflush(0);
- */
-                task = node_getEstruturaMinH (pendentes);
+              task = node_getEstruturaMinH (pendentes);
 
-                if (transfDisponivel(listaTransf, task))
-                  adicionaPendente(task, task->fd_outFIFO, pendentes);
-                else {
-                  pendentes = deleteNode(pendentes);
+              if (transfDisponivel(listaTransf, task))
+                adicionaPendente(task, task->fd_outFIFO, pendentes);
+              else {
+                pendentes = deleteNode(pendentes);
 
-                  for(int t = 0; t < task->nrTransf; t++)
-                      listaTransf = transfInc(listaTransf,task->transformations[t]);
+                for(int t = 0; t < task->nrTransf; t++)
+                  listaTransf = transfInc(listaTransf,task->transformations[t]);
 
-                  adicionaExecucao(task, execucao);
+                adicionaExecucao(task, execucao);
 
-                  if (((pid = fork()) == 0) ){
-                    //proc-file teste.txt bli.txt gcompress gdecompress
-                    // ver filhos -exec set follow-fork-mode child
-                    executar(transFolder, task);
-                    _exit(0);
-                  }
-                  close(task->fd);
+                if (((pid = fork()) == 0) ){
+                  executar(transFolder, task);
+                  _exit(0);
                 }
+                close(task->fd);
+              }
                 
             }
             free(task);
         
         }
-    }
-    
+    }    
     return 0;
 }
