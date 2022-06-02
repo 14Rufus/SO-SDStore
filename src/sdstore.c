@@ -25,17 +25,17 @@
 
 typedef struct message
 { 
-    int pid;
-    int type;
-    int priority;
-	char input[20];
-    char output[20];
-    int nrTransf;
-    int transformations[20];
+    int pid;                    //pid do processo cliente
+    int type;                   //tipo de mensagem
+    int priority;               //prioridade do pedido caso seja proc-file
+	char input[20];             //ficheiro input
+    char output[20];            //ficheiro output
+    int nrTransf;               //número de transferências
+    int transformations[20];    //array com os ints das transferencias
 
 } Message;
 
-
+//funçao que passa de int para string
 char* itoa(int i){
     char const digit[] = "0123456789";
     int p = 0;
@@ -57,7 +57,7 @@ char* itoa(int i){
 
     return b;
 }
-
+//cria uma estrutura message a partir do input (um array de strings)
 Message novoMessage(char** pedido, int comandoSize){
     Message new;
     
@@ -122,25 +122,30 @@ Message novoMessage(char** pedido, int comandoSize){
     return new;
 }
 
+
 int fd_Clients_Server;
 
 int main (int argc, char** argv){
     char* buffer = malloc(sizeof(char) * 1024);
-
+    
+    //cria um fifo com nome igual ao pid do processo cliente
     char* fifo_name = itoa(getpid());
     if (mkfifo(fifo_name, 0666))
         perror("Mkfifo");
     
+    //abre o descritor para escrever para o server
     if ((fd_Clients_Server = open("fifo_Clients_Server", O_WRONLY)) == -1) {
         perror("Error opening fifo\n");
         unlink(fifo_name);
         return -1;
     }
 
+    //cria mensagem a partir do input
     Message new = novoMessage(argv, argc);
 
     new.pid = getpid();
 
+    //envia a mensagem para o server a partir do fifo
     write(fd_Clients_Server, &new, sizeof(Message));
     close(fd_Clients_Server);
 
